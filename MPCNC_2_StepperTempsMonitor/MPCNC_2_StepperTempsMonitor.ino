@@ -115,8 +115,8 @@ void setup(void)
   tft.setTextColor(TFT_MAGENTA, TFT_BLACK); // Set the font colour AND the background colour
   tft.setTextFont(6);
   tft.setCursor(0,0,4); // sets cursor location and font number to use for next tft.println()
-  tft.println("MPCNC");
-  tft.println("Temps");
+  tft.println(" MPCNC");
+  tft.println(" Temps");
   tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Set the font colour AND the background colour    
   Serial.println("MPCNC Monitor with DS18B20 sensors and fan control. ");
   sensors.begin(); // Start up the temp sensors library
@@ -224,173 +224,27 @@ void printData(DeviceAddress deviceAddress) // Function to print information abo
   Serial.println();
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void loop(void)  // MAIN LOOP
+
+/////////////////////////////////////////////////////////////////////
+void AlarmSound()  // make a noise that is hard to ignore. TO DO: need an amplifier circuit to be heard when cutting wood.
 {
-  long startmillis = millis();
-  //Serial.print("Requesting temperatures...");
-  //DS18B20 NEEDS THE FOLLOWING LINE: 
-  sensors.requestTemperatures();   // temperature request to all devices on the bus
-  int elapsedmillis = millis() - startmillis;
-  //Serial.println("DONE. ");
-  //Serial.print(elapsedmillis);  // seems to be 503ms for precision of 12
-  //Serial.println(" ms conversion time");
-  
-  float Hottest_temp = 0.0;
-   
-    // Reading the fan tach lines caused a lot of spurious alarms when VFD was RUN at 0 spindle RPM.
-
-  Serial.print(" L fan speed: ");
-  Serial.println(ReadFanSpeed(LEFTFANTACHPIN));  // For some reason, this is not working. The function is being called, but it is not returning anything.
-  Serial.print(" R fan speed: ");
-  Serial.println(ReadFanSpeed(RIGHTFANTACHPIN));
-  Serial.print(" Bot. fan speed: ");
-  Serial.println(ReadFanSpeed(BOTTOMFANTACHPIN));
-
-  tft.setCursor(0,55,4); // sets cursor location and font number to use for next tft.println()
-  /*  The VFD temp sensor wire was causing interference that reset the ESP32.
-  float VFDtemp = printTemperature(VFDtempAddr);
-  Hottest_temp = max(Hottest_temp, VFDtemp);
-  tft.print("VFD: ");
-  tft.print(abs((int)VFDtemp));
-  tft.println("   ");
-  Serial.print("VFD: ");
-  Serial.println(VFDtemp);
-*/
-  float BoxAirTemp = printTemperature(BoxAirTempAddr);
-  Hottest_temp = max(Hottest_temp, BoxAirTemp);
-  tft.print("Box: ");
-  tft.print(abs((int)BoxAirTemp));
-  tft.println("   ");
-  Serial.print("Box: ");
-  Serial.print(BoxAirTemp);
-  
-  float X1_temp = printTemperature(X1_temp_addr);
-  Hottest_temp = max(Hottest_temp, X1_temp);
-  tft.print("X1:    ");
-  tft.print(abs((int)X1_temp));
-  tft.println("   ");
-  Serial.print(" X1:  ");
-  Serial.print(X1_temp);
-  
-  float X2_temp = printTemperature(X2_temp_addr);
-  Hottest_temp = max(Hottest_temp, X2_temp);
-  tft.print("X2:    ");
-  tft.print(abs((int)X2_temp));
-  tft.println("   ");
-  Serial.print(" X2: ");
-  Serial.print(X2_temp);
-  
-  float Y1_temp = printTemperature(Y1_temp_addr);
-  Hottest_temp = max(Hottest_temp, Y1_temp);
-  tft.print("Y1:    ");
-  tft.print(abs((int)Y1_temp));
-  tft.println("   ");
-  Serial.print(" Y1: ");
-  Serial.print(Y1_temp);
-  
-  float Y2_temp = printTemperature(Y2_temp_addr);
-  Hottest_temp = max(Hottest_temp, Y2_temp);
-  tft.print("Y2:    ");
-  tft.print(abs((int)Y2_temp));
-  tft.println("   ");
-  Serial.print(" Y2:");
-  Serial.print(Y2_temp);
-    
-  float Z_temp = printTemperature(Z_temp_addr);
-  Hottest_temp = max(Hottest_temp, Z_temp);
-  tft.print("Z:       ");
-  tft.print(abs((int)Z_temp));
-  tft.println("   ");
-  Serial.print(" Z:");
-  Serial.print(Z_temp);
-
-  Serial.print(" Hottest temp: ");
-  Serial.println(Hottest_temp);
-  if (Hottest_temp > MAXTEMP) OverTemperature = true;
-  else OverTemperature = false;
-    
- // tft.unloadFont(); // Remove the font to recover memory used
-  delay(1500); // so it will keep the temps on screen for a while before blanking.
-  ProcessAlarms(); // also blanks screen if no alarms.
-  Serial.print("Loop timestamp: ");
-  Serial.println(millis());
-}  // END main loop
-
-///////////////////////////////////////////////////////
-int ReadFanSpeed(int TachPin) // returns RPM
-// Used 4-wire fans that include both the PWM speed control and a tachometer line. I am using Akasa CPU fans.
- /* The readings were full of noise when I just used pinmode(tachpin, INPUT_PULLUP);
-  *  I needed to pull them up more stiffly, using a 1.8k pullup resistor to Vcc.
-  *  I also added a 220nF capacitor soldered next to the microprocessor, to short the HF noise to ground.
-  *  That was not enough filtering, so I added 680ohm resistors in series with the Tach signals. That should
-  *  make a low-pass filter with cutoff frequency of about 1kHz.
-  *  And since a tach pulse from the fan goes from Vcc (3.3V) to ground and back, pulseIn() should be set to LOW.
-  */
-  /* pulseIn() Syntax:
-  pulseIn(pin, value)
-  pulseIn(pin, value, timeout)
-  Returns the length of the pulse in microseconds.
-  pin: the number of the pin on which you want to read the pulse. (int)
-  value: type of pulse to read: either LOW (HIGH->LOW first) or HIGH (LOW->HIGH first). 
-  e.g., value == HIGH: if the pin is already high when the function is called, it will 
-  wait for the pin to go LOW and then HIGH before it starts counting. 
-  (int) timeout (optional): the number of microseconds to wait for the pulse to be completed: 
-  NOTE: the function returns 0 if no complete pulse was received within the timeout. 
-  Default is one second (unsigned long). I set it to 100ms with MaxFanTachPulseuS.
-  */
- {
-  //Serial.print(" Reading fan tachometer...");
-  int LocalFanRPM;
-  int loopCounter = 0;
-  float FanPulseSum = 0.0;
-  int PulsesToAverage = 10;
-  int LeftFanStallErrors = 0; // This is the outflow fan on my controller box
-  int RightFanStallErrors = 0; // Inflow fan. Filtered with a thin layer of gauze.
-  int BottomFanStallErrors = 0; // Gauze-filtered inflow just beneath the stepper drivers, which are arranged in a pentagon to make a cooling tower.
-  for (uint8_t i = 1; i <= (PulsesToAverage); i++)  // collect PulsesToAverage tachometer pulse lengths to average. Two pulses per revolution.                                     
-  {
-    loopCounter++;
-    Serial.print(i);
-    Serial.print(". Tach pin #");
-    Serial.print(TachPin);
-    FanTachPulseLength = (PULSEIN_CORRECTION_FACTOR * pulseIn(TachPin, LOW, MaxFanTachPulseuS));  // times out in (MaxFanTachPulseuS/1000) ms = 5 Hz if less than 150 rpm and returns zero. 
-    if (FanTachPulseLength == 0) // Because fan is stalled or very slow
-    {     
-     if (TachPin == LEFTFANTACHPIN) {LeftFanStallErrors++ ;}   // Fan not moving.
-     if (TachPin == RIGHTFANTACHPIN) {RightFanStallErrors++ ;} // Increment the error counts.
-     if (TachPin == BOTTOMFANTACHPIN) {BottomFanStallErrors++ ;} // Tach lines have a lot of noise, so we are looking for a number of these.
-     FanTachPulseLength = MaxFanTachPulseuS; 
-    }
-    
-    Serial.print(" Tach sample: " );
-    Serial.println(FanTachPulseLength);
-    if (FanTachPulseLength > 3000.0)  FanPulseSum += FanTachPulseLength; // (3ms) Only add the Tachometer measurement to the average if it is reasonable, 5-200 ms
-    else   i-- ; // if number was out of range, sample again.   
-    if (loopCounter > (PulsesToAverage + 3)) i = PulsesToAverage; // don't get stuck here.
+ for (int i = 1; i <= 20; i++) 
+  {  // Make a ramping up sound.
+      tone(SPEAKERPIN, Hertz, ToneLength_ms, SPEAKERCHANNEL); // line, freq (Hz), duration (ms), PWM channel to use
+      noTone(SPEAKERPIN, SPEAKERCHANNEL); // frees up the PWM channel for next use, and sets pin low, I think.    
+      Serial.print(Hertz);
+      Serial.println(" ALERT!");
+      Hertz = Hertz + ToneSpacing;
   }
-  if (LeftFanStallErrors >= (PulsesToAverage - 2)) {LftFanStalled = true;} // Set or reset any needed alarm flags. 
-  else LftFanStalled = false;  // reasonable fan speed
-  if (RightFanStallErrors >= (PulsesToAverage - 2)) {RtFanStalled = true;} // Error must persist for long enough to rule out tach line noise.
-  else RtFanStalled = false;
-  if (BottomFanStallErrors >= (PulsesToAverage - 2)) {BotFanStalled = true;}
-  else BotFanStalled = false;  
-  ProcessAlarms();
-  float FanPulseAvg = (FanPulseSum / float(PulsesToAverage)); // calculate the average.
-  Serial.print(" Avg fan pulse duration (uS): ");
-  Serial.print(FanPulseAvg); // I am doing this in steps because mixing floats and ints in one big equation kept giving me weird errors.
-   float uSperRev = FanPulseAvg*4 ; //EG FanPulseAvg = 9000 uS: uSperRev = 36,000
-   float RevPerUs =  1/ uSperRev  ; // 2.77e-5 RevPerUs
-   float RevPerSec = RevPerUs * 1000000; // 27.7 RevPerSec
-   LocalFanRPM = RevPerSec * 60; // 1,667 RPM
-  // 
-  // pulseIn() measures half a period (from HIGH to LOW transition (or from LOW to HIGH))
-                  // If there are two pulses per rev, that's 4 periods.
-                  // e.g., 20,000 usec = 20ms pulse: 80ms/rev. (1,000,000*60) us/min so 15,000,000 us/quarter-rev.                                           
-  Serial.print("  Fan RPM: ");
-  Serial.println(LocalFanRPM);
-  return LocalFanRPM;  // TO FIX: this is not returning anything. Why?
- }  // end ReadFanSpeed()
+  for (int i = 1; i <= 20; i++) 
+  {  // Make a ramping down sound.
+      tone(SPEAKERPIN, Hertz, ToneLength_ms, SPEAKERCHANNEL); // line, freq (Hz), duration (ms), PWM channel to use
+      noTone(SPEAKERPIN, SPEAKERCHANNEL); // frees up the PWM channel for next use, and sets pin low, I think.    
+      Serial.print(Hertz);
+      Serial.println(" ALERT!");
+      Hertz = Hertz - ToneSpacing;
+  }
+} // end AlarmSound()
 
 /////////////////////////////////////////////////////////////////
 void ProcessAlarms()  // Process various alarm conditions
@@ -451,30 +305,180 @@ void ProcessAlarms()  // Process various alarm conditions
    tft.fillScreen(TFT_BLACK);
    tft.setTextColor(TFT_MAGENTA, TFT_BLACK); // Set the font colour AND the background colour
    tft.setCursor(0,0,4); // 
-   tft.println("MPCNC");
-   tft.println("Temps");
+   tft.println(" MPCNC");
+   tft.println(" Temps");
    tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Set the font colour AND the background colour        
   }
 } // end ProcessAlarms()
 
+///////////////////////////////////////////////////////
+int ReadFanSpeed(int TachPin) // returns RPM
+// Used 4-wire fans that include both the PWM speed control and a tachometer line. I am using Akasa CPU fans.
+ /* The readings were full of noise when I just used pinmode(tachpin, INPUT_PULLUP);
+  *  I needed to pull them up more stiffly, using a 1.8k pullup resistor to Vcc.
+  *  I also added a 220nF capacitor soldered next to the microprocessor, to short the HF noise to ground.
+  *  That was not enough filtering, so I added 680ohm resistors in series with the Tach signals. That should
+  *  make a low-pass filter with cutoff frequency of about 1kHz.
+  *  And since a tach pulse from the fan goes from Vcc (3.3V) to ground and back, pulseIn() should be set to LOW.
+  */
+  /* pulseIn() Syntax:
+  pulseIn(pin, value)
+  pulseIn(pin, value, timeout)
+  Returns the length of the pulse in microseconds.
+  pin: the number of the pin on which you want to read the pulse. (int)
+  value: type of pulse to read: either LOW (HIGH->LOW first) or HIGH (LOW->HIGH first). 
+  e.g., value == HIGH: if the pin is already high when the function is called, it will 
+  wait for the pin to go LOW and then HIGH before it starts counting. 
+  (int) timeout (optional): the number of microseconds to wait for the pulse to be completed: 
+  NOTE: the function returns 0 if no complete pulse was received within the timeout. 
+  Default is one second (unsigned long). I set it to 100ms with MaxFanTachPulseuS.
+  */
+ {
+  //Serial.print(" Reading fan tachometer...");
+  int LocalFanRPM;
+  int loopCounter = 0;
+  float FanPulseSum = 0.0;
+  int PulsesToAverage = 10;
+  int LeftFanStallErrors = 0; // This is the outflow fan on my controller box
+  int RightFanStallErrors = 0; // Inflow fan. Filtered with a thin layer of gauze.
+  int BottomFanStallErrors = 0; // Gauze-filtered inflow just beneath the stepper drivers, which are arranged in a pentagon to make a cooling tower.
+  for (uint8_t i = 1; i <= (PulsesToAverage); i++)  // collect PulsesToAverage tachometer pulse lengths to average. Two pulses per revolution.                                     
+  {
+    loopCounter++;
+    Serial.print(i);
+    Serial.print(". Tach pin #");
+    Serial.print(TachPin);
+    FanTachPulseLength = (PULSEIN_CORRECTION_FACTOR * pulseIn(TachPin, LOW, MaxFanTachPulseuS));  // times out in (MaxFanTachPulseuS/1000) ms = 5 Hz if less than 150 rpm and returns zero. 
+    if (FanTachPulseLength == 0) // Because fan is stalled
+    {     
+     if (TachPin == LEFTFANTACHPIN) {LeftFanStallErrors++ ;}   // Fan not moving.
+     if (TachPin == RIGHTFANTACHPIN) {RightFanStallErrors++ ;} // Increment the error counts.
+     if (TachPin == BOTTOMFANTACHPIN) {BottomFanStallErrors++ ;} // Tach lines have a lot of noise, so we are looking for a number of these.
+     FanTachPulseLength = MaxFanTachPulseuS; 
+    }
+    
+    Serial.print(" Tach sample: " );
+    Serial.println(FanTachPulseLength);
+    if (FanTachPulseLength > 3000.0)  FanPulseSum += FanTachPulseLength; // (3ms) Only add the Tachometer measurement to the average if it is reasonable, 5-200 ms
+    else   i-- ; // if number was out of range, sample again.   
+    if (loopCounter > (PulsesToAverage + 3)) i = PulsesToAverage; // don't get stuck here.
+  }
+  if (LeftFanStallErrors >= (PulsesToAverage - 2)) {LftFanStalled = true;} // Set or reset any needed alarm flags. 
+  else LftFanStalled = false;  // reasonable fan speed
+  if (RightFanStallErrors >= (PulsesToAverage - 2)) {RtFanStalled = true;} // Error must persist for long enough to rule out tach line noise.
+  else RtFanStalled = false;
+  if (BottomFanStallErrors >= (PulsesToAverage - 2)) {BotFanStalled = true;}
+  else BotFanStalled = false;  
+  ProcessAlarms();
+  float FanPulseAvg = (FanPulseSum / float(PulsesToAverage)); // calculate the average.
+  Serial.print(" Avg fan pulse duration (uS): ");
+  Serial.print(FanPulseAvg); // I am doing this in steps because mixing floats and ints in one big equation kept giving me weird errors.
+   float uSperRev = FanPulseAvg*4 ; //EG FanPulseAvg = 9000 uS: uSperRev = 36,000
+   float RevPerUs =  1/ uSperRev  ; // 2.77e-5 RevPerUs
+   float RevPerSec = RevPerUs * 1000000; // 27.7 RevPerSec
+   LocalFanRPM = RevPerSec * 60; // 1,667 RPM
+  // 
+  // pulseIn() measures half a period (from HIGH to LOW transition (or from LOW to HIGH))
+                  // If there are two pulses per rev, that's 4 periods.
+                  // e.g., 20,000 usec = 20ms pulse: 80ms/rev. (1,000,000*60) us/min so 15,000,000 us/quarter-rev.                                           
+  Serial.print("  Fan RPM: ");
+  Serial.println(LocalFanRPM);
+  return LocalFanRPM;  // TO FIX: this is not returning anything. Why?
+ }  // end ReadFanSpeed()
 
-/////////////////////////////////////////////////////////////////////
-void AlarmSound()  // make a noise that is hard to ignore. TO DO: need an amplifier circuit to be heard when cutting wood.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void loop(void)  // MAIN LOOP
 {
- for (int i = 1; i <= 20; i++) 
-  {  // Make a ramping up sound.
-      tone(SPEAKERPIN, Hertz, ToneLength_ms, SPEAKERCHANNEL); // line, freq (Hz), duration (ms), PWM channel to use
-      noTone(SPEAKERPIN, SPEAKERCHANNEL); // frees up the PWM channel for next use, and sets pin low, I think.    
-      Serial.print(Hertz);
-      Serial.println(" ALERT!");
-      Hertz = Hertz + ToneSpacing;
-  }
-  for (int i = 1; i <= 20; i++) 
-  {  // Make a ramping down sound.
-      tone(SPEAKERPIN, Hertz, ToneLength_ms, SPEAKERCHANNEL); // line, freq (Hz), duration (ms), PWM channel to use
-      noTone(SPEAKERPIN, SPEAKERCHANNEL); // frees up the PWM channel for next use, and sets pin low, I think.    
-      Serial.print(Hertz);
-      Serial.println(" ALERT!");
-      Hertz = Hertz - ToneSpacing;
-  }
-} // end AlarmSound()
+  long startmillis = millis();
+  //Serial.print("Requesting temperatures...");
+  //DS18B20 NEEDS THE FOLLOWING LINE: 
+  sensors.requestTemperatures();   // temperature request to all devices on the bus
+  int elapsedmillis = millis() - startmillis;
+  //Serial.println("DONE. ");
+  //Serial.print(elapsedmillis);  // seems to be 503ms for precision of 12
+  //Serial.println(" ms conversion time");
+  
+  float Hottest_temp = 0.0;
+   
+    // Reading the fan tach lines caused a lot of spurious alarms when VFD was RUN at 0 spindle RPM.
+  FanRPM = ReadFanSpeed(LEFTFANTACHPIN);
+  Serial.print(" L fan speed: ");
+  Serial.println(FanRPM); 
+  FanRPM = ReadFanSpeed(RIGHTFANTACHPIN);
+  Serial.print(" R fan speed: ");
+  Serial.println(FanRPM);
+  FanRPM = ReadFanSpeed(BOTTOMFANTACHPIN);
+  Serial.print(" Bot. fan speed: ");
+  Serial.println(FanRPM);
+
+  tft.setCursor(0,55,4); // sets cursor location and font number to use for next tft.println()
+  /*  The VFD temp sensor wire was causing interference that reset the ESP32.
+  float VFDtemp = printTemperature(VFDtempAddr);
+  Hottest_temp = max(Hottest_temp, VFDtemp);
+  tft.print("VFD: ");
+  tft.print(abs((int)VFDtemp));
+  tft.println("   ");
+  Serial.print("VFD: ");
+  Serial.println(VFDtemp);
+*/
+  float BoxAirTemp = printTemperature(BoxAirTempAddr);
+  Hottest_temp = max(Hottest_temp, BoxAirTemp);
+  tft.print("Box: ");
+  tft.print(abs((int)BoxAirTemp));
+  tft.println("   ");
+  Serial.print("Box: ");
+  Serial.print(BoxAirTemp);
+  
+  float X1_temp = printTemperature(X1_temp_addr);
+  Hottest_temp = max(Hottest_temp, X1_temp);
+  tft.print("X1:    ");
+  tft.print(abs((int)X1_temp));
+  tft.println("   ");
+  Serial.print(" X1:  ");
+  Serial.print(X1_temp);
+  
+  float X2_temp = printTemperature(X2_temp_addr);
+  Hottest_temp = max(Hottest_temp, X2_temp);
+  tft.print("X2:    ");
+  tft.print(abs((int)X2_temp));
+  tft.println("   ");
+  Serial.print(" X2: ");
+  Serial.print(X2_temp);
+  
+  float Y1_temp = printTemperature(Y1_temp_addr);
+  Hottest_temp = max(Hottest_temp, Y1_temp);
+  tft.print("Y1:    ");
+  tft.print(abs((int)Y1_temp));
+  tft.println("   ");
+  Serial.print(" Y1: ");
+  Serial.print(Y1_temp);
+  
+  float Y2_temp = printTemperature(Y2_temp_addr);
+  Hottest_temp = max(Hottest_temp, Y2_temp);
+  tft.print("Y2:    ");
+  tft.print(abs((int)Y2_temp));
+  tft.println("   ");
+  Serial.print(" Y2:");
+  Serial.print(Y2_temp);
+    
+  float Z_temp = printTemperature(Z_temp_addr);
+  Hottest_temp = max(Hottest_temp, Z_temp);
+  tft.print("Z:       ");
+  tft.print(abs((int)Z_temp));
+  tft.println("   ");
+  Serial.print(" Z:");
+  Serial.print(Z_temp);
+  tft.print("Fan ");
+  tft.println(FanRPM);
+
+  Serial.print(" Hottest temp: ");
+  Serial.println(Hottest_temp);
+  if (Hottest_temp > MAXTEMP) OverTemperature = true;
+  else OverTemperature = false;
+    
+ // tft.unloadFont(); // Remove the font to recover memory used
+  delay(1500); // so it will keep the temps on screen for a while before blanking.
+  ProcessAlarms(); // also blanks screen if no alarms.
+  Serial.print("Loop timestamp: ");
+  Serial.println(millis());
+}  // END main loop
